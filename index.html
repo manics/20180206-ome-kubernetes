@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Kubernetes and the OME</title>
+	<meta charset="utf-8">
+	<meta http-equiv="x-ua-compatible" content="ie=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="shower/themes/ribbon/styles/screen-16x10.css">
+
+  <style>
+    .grid-container {
+      display: grid;
+    }
+  </style>
+</head>
+<body class="shower list">
+
+	<header class="caption">
+		<h1>Kubernetes / Container orchestration and the OME</h1>
+		<p>Simon Li</p>
+	</header>
+
+	<section class="slide clear" id="cover">
+		<h2><span style="background-color: transparent; background-image: repeating-linear-gradient(175deg, transparent, transparent 50%, white 51%, white 57%, transparent 58%, transparent);">Kubernetes</span> Container orchestration and the OME</h2>
+		<p style="text-align: right;">Simon Li</p>
+		<figure>
+			<img class="cover" src="pictures/cover.jpg" alt="Microscope Pony on a container">
+			<figcaption>
+				<a href="https://flic.kr/p/6BycMR">CC BY-NC 2.0 https://flic.kr/p/6BycMR</a>
+			</figcaption>
+		</figure>
+		<style>
+			#cover h2 {
+				margin:30px 0 0;
+				color:#FFF;
+				text-align:center;
+				font-size:70px;
+				}
+			#cover p {
+				margin:10px 0 0;
+				text-align:center;
+				color:#FFF;
+				font-style:italic;
+				font-size:20px;
+				}
+				#cover p a {
+					color:#FFF;
+					}
+		</style>
+	</section>
+
+	<section class="slide">
+		<h2>Overview</h2>
+		<ol>
+			<li>What is container orchestration?</li>
+			<li>Why would you use it?</li>
+			<li>Are there any bad things?</li>
+		</ol>
+	</section>
+
+	<section class="slide">
+		<blockquote>
+		    <h2>
+          Kubernetes is an open-source platform designed to automate deploying, scaling, and operating application containers.
+		     </h2>
+      </blockquote>
+			<figcaption><a href="https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/">https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/</a></figcaption>
+	</section>
+
+	<section class="slide">
+		<h2>Containers</h2>
+		<ul>
+      <li>A lightweight form of virtualisation</li>
+      <li>A methodology for packaging and distributing applications</li>
+      <li class="next">Docker: a platform and set of tools for building and running applications in isolated containers</li>
+    </ul>
+	</section>
+
+	<section class="slide">
+		<h2>OMERO in Docker</h2>
+    <div class="grid-container" style="grid-template-columns: 1fr 1fr;">
+      <div>
+        <img src="pictures/postgresql-logo.png" width="256" />
+      </div>
+      <div></div>
+      <div>
+        <img src="pictures/omero-logo-800.png" width="256" >server
+      </div>
+      <div>⬅ 4063, 4064 ➡</div>
+      <div>
+        <img src="pictures/omero-logo-800.png" width="256" />web
+      </div>
+      <div></div>
+      <div>
+        <img src="pictures/nginx-logo.svg" width="256" />
+      </div>
+      <div>⬅ 80, 443 ➡</div>
+    </div>
+	</section>
+
+	<section class="slide">
+		<h2>The long way</h2>
+    <p><code>docker run postgres</code></p>
+    <p><code>docker run -p 4064:4064 openmicroscopy/omero-server</code></p>
+    <p><code>docker run openmicroscopy/omero-web</code></p>
+    <p><code>docker run nginx</code></p>
+	</section>
+
+	<section class="slide">
+		<h2>The easier way: <code>docker-compose</code></h2>
+		<pre><code class="double" style="font-size: 10pt;">
+version: "3"
+services:
+  database:
+    image: "postgres:9.6"
+    environment:
+      - POSTGRES_PASSWORD=SeCrEtPaSsWoRd
+    networks:
+      - omero-network
+    volumes:
+      - "database-volume:/var/lib/postgresql/data"
+  omeroserver:
+    image: "openmicroscopy/omero-server:5.4.0"
+    environment:
+      - CONFIG_omero_db_pass=SeCrEtPaSsWoRd
+    networks:
+      - omero-network
+    ports:
+      - "4063:4063"
+      - "4064:4064"
+    volumes:
+      - "omero-volume:/OMERO"
+  omeroweb:
+    image: "openmicroscopy/omero-web-standalone:master"
+    environment:
+      - OMEROHOST=omeroserver
+    networks:
+      - omero-network
+    ports:
+      - "4080:4080"
+networks:
+  omero-network:
+volumes:
+  database-volume:
+  omero-volume:
+    </pre></code>
+	</section>
+
+  <section class="slide">
+    <h2>Growing bigger: OMERO at scale</h2>
+    <ul class="double">
+      <li>Redis</li>
+      <li>Multiple OMERO.web</li>
+      <li>OMERO read-only servers</li>
+      <li>Web-apps</li>
+      <li>OMERO.scripts</li>
+      <li>LDAP server</li>
+      <li>JupyterHub</li>
+    </ul>
+  </section>
+
+  <section class="slide">
+    <h2 class="shout grow">This is too big for a single server</h2>
+    <figcaption class="place bottom right"><a href="https://www.youtube.com/watch?v=xBgThvB_IDQ">https://www.youtube.com/watch?v=xBgThvB_IDQ</a></figcaption>
+  </section>
+
+  <section class="slide">
+    <ol>
+      <li class="next">Manually run containers on different hosts</li>
+      <li class="next">Automatically schedule containers across different hosts</li>
+      <ul class="next">
+        <li>Kubernetes</li>
+        <li>Docker Swarm</li>
+        <li>Apache Mesos, DC/OS</li>
+        <li>...</li>
+      </ul>
+    </ol>
+  </section>
+
+  <section class="slide">
+    <h2>Why are container orchestration tools such as Kubernetes so great?</h2>
+      <div><img src="pictures/blue_pony.svg" style="width: 40%;" class="place bottom right"></div>
+      <ul>
+        <li>Schedule <mark>applications</mark> across multiple server based on constraints</li>
+        <li>Allow everything to be defined in version controlled files</li>
+        <li>Automatically restart failed applications</li>
+        <li>Automatically move applications off a failed server</li>
+        <li>Provide <mark>service discovery</mark></li>
+  </section>
+
+  <section class="slide">
+    <h2>Growing bigger: OME at scale</h2>
+    <ul class="double">
+      <li>Redis</li>
+      <li>Multiple OMERO.web</li>
+      <li>OMERO read-only servers</li>
+      <li>Web-apps</li>
+      <li>OMERO.scripts</li>
+      <li>LDAP server</li>
+      <li>JupyterHub</li>
+      <li>Downloads</li>
+      <li>Uploads</li>
+      <li>Docs</li>
+      <li>Experimental applications</li>
+      <li><mark>Microservices (10s? 100s?)</mark></li>
+    </ul>
+  </section>
+
+  <section class="slide" id="kubernetes-model">
+    <h2>The Kubernetes model of the world</h2>
+      <div class="grid-container" style="grid-template-columns: 1fr 1fr;">
+        <div class="next">
+          <h2>Pods</h2>
+          <p>A <mark>containerised app</mark>, e.g. OMERO.web, omero-ms-thumbnail.</p>
+        </div>
+        <div class="next">
+          <h2>Deployments</h2>
+          <mark>Manages</mark> one or more pods, e.g. replication and restarts.
+        </div>
+        <div class="next">
+          <h2>Services</h2>
+          The <mark>interface</mark> to a deployment. Provides load-balancing.
+        </div>
+        <div class="next">
+          <h2>Service Discovery</h2>
+          DNS provides named-based <mark>lookup</mark> of services
+        </div>
+      </div>
+
+      <style>
+      #kubernetes-model div div {
+        background-color: #ddd;
+        padding: 2px;
+        border: 2px solid white;
+      }
+      </style>
+  </section>
+
+  <section class="slide" id="problemsnoopy">
+    <h2>Problems</h2>
+
+    <h2 class="speech-bubble place left">
+      Conflict detected!
+    </h2>
+    <img src="pictures/snoopycrimecop.png" style="transform: scaleX(-1);" class="place bottom right">
+    <style>
+      #problemsnoopy .speech-bubble {
+        position: relative;
+        background: #ff6666;
+        border-radius: 1em;
+        padding: 1em;
+        width: 50%;
+        text-align: center;
+      }
+      #problemsnoopy .speech-bubble:after {
+        content: '';
+        position: absolute;
+        right: 0;
+        top: 50%;
+        width: 0;
+        height: 0;
+        border: 39px solid transparent;
+        border-left-color: #ff6666;
+        border-right: 0;
+        border-bottom: 0;
+        margin-top: -19.5px;
+        margin-right: -39px;
+      }
+    </style>
+  </section>
+
+  <section class="slide" id="debuggingome1">
+    <h2>Debugging</h2>
+    <div class="grid-container micro" style="grid-template-columns: repeat(10, 1fr);">
+      <div>a</div>
+      <div>a</div>
+      <div>a</div>
+      <div>a</div>
+      <div>a</div>
+      <div>a</div>
+      <div>a</div>
+      <div>a</div>
+      <div>a</div>
+      <div>a</div>
+    </div>
+    <div class="grid-container micro" style="grid-template-columns: repeat(10, 1fr);">
+      <div>b</div>
+      <div>b</div>
+      <div>b</div>
+      <div>b</div>
+      <div>b</div>
+      <div>b</div>
+      <div>b</div>
+      <div>b</div>
+      <div>b</div>
+      <div>b</div>
+    </div>
+    <div class="grid-container micro" style="grid-template-columns: repeat(10, 1fr);">
+      <div>c</div>
+      <div>c</div>
+      <div>c</div>
+      <div>c</div>
+      <div>c</div>
+      <div>c</div>
+      <div>c</div>
+      <div>c</div>
+      <div>c</div>
+      <div>c</div>
+    </div>
+    <div class="grid-container micro" style="grid-template-columns: repeat(10, 1fr);">
+      <div>d</div>
+      <div>d</div>
+      <div>d</div>
+      <div>d</div>
+      <div>d</div>
+      <div>d</div>
+      <div>d</div>
+      <div>d</div>
+      <div>d</div>
+      <div>d</div>
+    </div>
+    <div class="grid-container micro" style="grid-template-columns: repeat(10, 1fr);">
+      <div>e</div>
+      <div>e</div>
+      <div>e</div>
+      <div>e</div>
+      <div>e</div>
+      <div>e</div>
+      <div>e</div>
+      <div>e</div>
+      <div>e</div>
+      <div>e</div>
+    </div>
+    <style>
+      #debuggingome1 div.grid-container {
+        counter-reset: n;
+        padding: 5px 0;
+      }
+      #debuggingome1 div div {
+        border: 1px dotted red;
+        width: 50px;
+        background-image: url("pictures/ome-logo.png");
+        background-size: contain;
+        background-repeat: no-repeat;
+        text-align: center;
+        color: grey;
+        counter-increment: n;
+      }
+      #debuggingome1 .micro div::after {
+        content: counters(n,".")
+      }
+    </style>
+  </section>
+
+  <section class="slide" id="debuggingome2">
+    <h2>Debugging/Tracing</h2>
+    <div class="grid-container micro" style="grid-template-columns: repeat(10, 1fr);">
+      <div>a</div>
+      <div>a</div>
+      <div style="border: 5px solid green;">a</div>
+      <div style="border: 5px solid yellow;">a</div>
+      <div>a</div>
+      <div>a</div>
+      <div>a</div>
+      <div>a</div>
+      <div>a</div>
+      <div>a</div>
+    </div>
+    <div class="grid-container micro" style="grid-template-columns: repeat(10, 1fr);">
+      <div style="border: 5px solid yellow;">b</div>
+      <div>b</div>
+      <div>b</div>
+      <div>b</div>
+      <div>b</div>
+      <div>b</div>
+      <div>b</div>
+      <div>b</div>
+      <div>b</div>
+      <div>b</div>
+    </div>
+    <div class="grid-container micro" style="grid-template-columns: repeat(10, 1fr);">
+      <div>c</div>
+      <div>c</div>
+      <div style="border: 5px solid orange;">c</div>
+      <div>c</div>
+      <div>c</div>
+      <div>c</div>
+      <div>c</div>
+      <div>c</div>
+      <div style="border: 5px solid green;">c</div>
+      <div>c</div>
+    </div>
+    <div class="grid-container micro" style="grid-template-columns: repeat(10, 1fr);">
+      <div style="border: 5px solid green;">d</div>
+      <div>d</div>
+      <div>d</div>
+      <div>d</div>
+      <div>d</div>
+      <div>d</div>
+      <div>d</div>
+      <div>d</div>
+      <div>d</div>
+      <div style="border: 5px solid yellow;">d</div>
+    </div>
+    <div class="grid-container micro" style="grid-template-columns: repeat(10, 1fr);">
+      <div>e</div>
+      <div>e</div>
+      <div>e</div>
+      <div style="border: 5px solid orange;">e</div>
+      <div style="border: 5px solid orange;">e</div>
+      <div>e</div>
+      <div>e</div>
+      <div>e</div>
+      <div>e</div>
+      <div style="border: 5px solid orange;">e</div>
+    </div>
+    <div class="grid-container data" style="grid-template-columns: repeat(2, 1fr);">
+      <h2 class="next">Centralised logging</h2>
+      <h2 class="next">Traceable identifiers</h2>
+    </div>
+    <style>
+      #debuggingome2 div.grid-container {
+        counter-reset: n;
+        padding: 5px 0;
+      }
+      #debuggingome2 div div {
+        border: 1px dotted red;
+        width: 50px;
+        background-image: url("pictures/ome-logo.png");
+        background-size: contain;
+        background-repeat: no-repeat;
+        text-align: center;
+        color: grey;
+        counter-increment: n;
+      }
+      #debuggingome2 .micro div::after {
+        content: counters(n,".")
+      }
+      #debuggingome2 .data h2 {
+        text-align: center;
+        border: 3px solid magenta;
+        margin: 5px;
+      }
+    </style>
+  </section>
+
+  <section class="slide" id="wheresdataserver1">
+    <h2>Where's my data?</h2>
+    <div class="grid-container" style="grid-template-columns: repeat(2, 1fr);">
+      <div class="server">
+        <img style="animation: wheresdataserver1blink 1s step-end infinite;" src="pictures/omero-logo-800.png" />
+        <img style="animation: wheresdataserver1blink 1s step-end infinite;" src="pictures/ome-logo.png" />
+      </div>
+      <div class="server">
+        <img src="pictures/postgresql-logo.png" />
+        <img src="pictures/ome-logo.png" />
+        <img src="pictures/jupyter.png" />
+      </div>
+      <div class="server">
+        <img src="pictures/ome-logo.png" />
+        <img src="pictures/ome-logo.png" />
+        <img src="pictures/nginx-logo.svg" />
+      </div>
+      <div class="server">
+        <img src="pictures/jupyter.png" />
+        <img src="pictures/ome-logo.png" />
+        <img src="pictures/ome-logo.png" />
+      </div>
+    </div>
+    <style>
+      #wheresdataserver1 .server {
+        border: 3px solid black;
+        height: 150px;
+        padding: 5px;
+        margin: 5px;
+      }
+      #wheresdataserver1 .server img {
+        height: 40%;
+      }
+      @keyframes wheresdataserver1blink {
+        0%, 100% {
+          background-color: lightgrey;
+        }
+        75% {
+          background-color: transparent;
+        }
+      }
+    </style>
+  </section>
+
+  <section class="slide" id="wheresdataserver2">
+    <h2>Where's my data?</h2>
+    <div class="grid-container" style="grid-template-columns: repeat(2, 1fr);">
+      <div class="server outage">
+      </div>
+      <div class="server">
+        <img src="pictures/postgresql-logo.png" />
+        <img src="pictures/ome-logo.png" />
+        <img src="pictures/jupyter.png" />
+      </div>
+      <div class="server">
+        <img src="pictures/ome-logo.png" />
+        <img src="pictures/ome-logo.png" />
+        <img src="pictures/nginx-logo.svg" />
+        <img style="animation: wheresdataserver1blink 1s step-end infinite;" src="pictures/ome-logo.png" />
+      </div>
+      <div class="server">
+        <img src="pictures/jupyter.png" />
+        <img src="pictures/ome-logo.png" />
+        <img src="pictures/ome-logo.png" />
+        <img style="animation: wheresdataserver1blink 1s step-end infinite;" src="pictures/omero-logo-800.png" />
+      </div>
+    </div>
+    <h2 class="server next" style="height: auto; border-color: magenta;">Shared data store</h2>
+    <style>
+      #wheresdataserver2 .server {
+        border: 3px solid black;
+        height: 150px;
+        padding: 5px;
+        margin: 5px;
+      }
+      #wheresdataserver2 .outage {
+        background: repeating-linear-gradient(
+          45deg,
+          black,
+          black 15px,
+          yellow 15px,
+          yellow 30px
+        );
+      }
+      #wheresdataserver2 .server img {
+        height: 40%;
+      }
+      #wheresdataserver2 h2.server {
+        text-align: center;
+      }
+      @keyframes wheresdataserver2blink {
+        0%, 100% {
+          background-color: lightgrey;
+        }
+        75% {
+          background-color: transparent;
+        }
+      }
+    </style>
+  </section>
+
+  <section class="slide">
+    <h2>Kubernetes vs Docker Swarm</h2>
+    <ul>
+      <li>Almost feature equivalent</li>
+      <li>But Docker has a taken a long time to get here, everything is very new</li>
+      <li>Kubernetes has a lot bigger adoption amongst organisations</li>
+      <li>Part of the Cloud Native Computing Foundation</li>
+    </ul>
+    <figcaption class="place bottom right">
+      <a href="https://platform9.com/blog/container-orchestration-tool/">https://platform9.com/blog/container-orchestration-tool/</a><br>
+      <a href="https://platform9.com/blog/kubernetes-docker-swarm-compared/">https://platform9.com/blog/kubernetes-docker-swarm-compared/</a>
+    </figcaption>
+  </section>
+
+	<section class="slide clear" id="picture">
+		<figure>
+			<img class="cover" src="pictures/cover.jpg" alt="Microscope Pony on a container">
+			<figcaption>
+				<a href="https://flic.kr/p/6BycMR">CC BY-NC 2.0 https://flic.kr/p/6BycMR</a>
+			</figcaption>
+		</figure>
+	</section>
+
+	<footer class="badge">
+		<a href="https://www.openmicroscopy.org/" style="background-color: white; padding: 5px 0 0 0;"><img src="pictures/ome-main-nav.svg" height="20" /></a>
+	</footer>
+
+	<div class="progress"></div>
+
+	<script src="shower/shower.min.js"></script>
+
+</body>
+</html>
